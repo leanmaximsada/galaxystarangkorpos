@@ -1,0 +1,6 @@
+{
+  "name": "Galaxy Star Angkor Hotel",
+  "description": "Hotel Management System for Galaxy Star Angkor Hotel supporting English & Khmer, dual KHR/USD currencies, front-desk payment processing, reservations, and room operations.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

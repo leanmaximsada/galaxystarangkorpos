@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-deep-navy: #111B3A;
+    --color-royal-navy: #253B73;
+    --color-angkor-pink: #D81B73;
+    --color-champagne-gold: #C9A96E;
+    --color-ivory: #FAF9F6;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', 'Noto Sans Khmer', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-khmer {
+    font-family: 'Noto Sans Khmer', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  .font-brand {
+    font-family: 'Cinzel', 'Plus Jakarta Sans', serif;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}
+
