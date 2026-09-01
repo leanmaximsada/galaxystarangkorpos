@@ -51,31 +51,49 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync mode when initialMode changes
+  // Reset state on open, then immediately start the camera in the same
+  // effect — no separate effect racing on a stale `capturedImage` value.
   useEffect(() => {
-    if (isOpen) {
-      setMode(initialMode);
-      setCapturedImage(null);
-      setIsScanning(false);
-      setScanProgress(0);
+    if (!isOpen) {
+      stopCamera();
+      return;
     }
+
+    setMode(initialMode);
+    setCapturedImage(null);
+    setIsScanning(false);
+    setScanProgress(0);
+
+    if (initialMode === 'CAMERA') {
+      startCamera();
+    }
+
+    return () => {
+      stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialMode]);
 
-  // Handle Camera stream start/stop
+  // Handle camera restart when the user switches tabs (CAMERA <-> SCANNER),
+  // flips front/back facing, or retakes a photo — separate from the
+  // open/reset effect above so there's no stale-state race on mount.
   useEffect(() => {
-    if (isOpen && mode === 'CAMERA' && !capturedImage) {
+    if (!isOpen) return;
+    if (mode === 'CAMERA' && !capturedImage) {
       startCamera();
     } else {
       stopCamera();
     }
-    return () => {
-      stopCamera();
-    };
-  }, [isOpen, mode, facingMode, capturedImage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, facingMode, capturedImage]);
 
   const startCamera = async () => {
     setCameraError(null);
     stopCamera();
+    // Give the browser a moment to fully release the previous stream
+    // before requesting a new one — prevents "device already in use"
+    // failures that otherwise strand the user on the loading screen.
+    await new Promise(resolve => setTimeout(resolve, 100));
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -360,7 +378,7 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
             }`}
           >
             <ComputerDesktopIcon className="w-4 h-4" />
-            <span>{isKhmer ? 'ម៉ាស៊ីនព្រីនធ័រ / ស្កេនលើតុ (Desktop Printer)' : 'Desktop Flatbed Scanner'}</span>
+            <span>{isKhmer ? 'ផ្ទុកឡើងឯកសារស្កេន (Upload Scan)' : 'Upload Scanned File'}</span>
           </button>
         </div>
 
@@ -507,101 +525,41 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
               </div>
             </div>
           ) : (
-            /* VIEW 3: DESKTOP PRINTER & FLATBED SCANNER MODE */
-            <div className="w-full max-w-lg space-y-6">
-              <div className="bg-[#0C152B] p-5 rounded-2xl border border-[#253B73] relative overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-900/50 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                      <PrinterIcon className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-white">Canon / EPSON Front-Desk Flatbed Scanner</h4>
-                      <p className="text-[11px] text-emerald-400 flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Ready & Connected (USB / LAN 300 DPI)</span>
-                      </p>
-                    </div>
+            /* VIEW 3: UPLOAD A REAL SCANNED FILE */
+            <div className="w-full max-w-lg space-y-5">
+              <div className="bg-[#0C152B] p-5 rounded-2xl border border-[#253B73] space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#1B2C57]/50 border border-[#4F71AC]/30 flex items-center justify-center text-[#6D8BC3] shrink-0">
+                    <PrinterIcon className="w-6 h-6" />
+                  </div>
+                  <div className="text-xs text-gray-300 leading-relaxed">
+                    {isKhmer
+                      ? 'ស្កេនអត្តសញ្ញាណប័ណ្ណដោយប្រើកម្មវិធីរបស់ម៉ាស៊ីនស្កេន/ព្រីនធ័រផ្ទាល់ខ្លួន (Canon, EPSON, Windows Scan, ...) រក្សាទុកជា JPG, PNG ឬ PDF រួចជ្រើសរើសឯកសារនោះខាងក្រោម។'
+                      : "Scan the ID using your scanner or printer's own software (Canon/EPSON app, Windows Scan, macOS Image Capture, etc.), save it as JPG, PNG, or PDF, then choose that file below."}
                   </div>
                 </div>
 
-                {/* Flatbed Glass Scanner Visual Representation */}
-                <div className="relative h-44 bg-slate-900 rounded-xl border border-slate-700 overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
-
-                  {/* ID card sitting on glass */}
-                  <div className="w-48 h-32 bg-slate-800 border border-amber-500/40 rounded-lg p-2.5 flex flex-col justify-between shadow-lg relative z-10">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-[#C9A96E]">KINGDOM OF CAMBODIA</span>
-                      <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1 rounded">NATIONAL ID</span>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <div className="w-10 h-14 bg-slate-700 rounded flex items-center justify-center text-[8px] text-gray-400">
-                        PHOTO
-                      </div>
-                      <div className="space-y-1 text-[9px] text-gray-300 flex-1">
-                        <div className="h-2 bg-slate-700 rounded w-3/4" />
-                        <div className="h-2 bg-slate-700 rounded w-1/2" />
-                        <div className="h-2 bg-slate-700 rounded w-5/6" />
-                      </div>
-                    </div>
-                    <div className="text-[8px] font-mono text-gray-400">IDKHM098234891234</div>
-                  </div>
-
-                  {/* Laser Scan Line Animation */}
-                  {isScanning && (
-                    <div 
-                      className="absolute top-0 bottom-0 w-2 bg-gradient-to-r from-emerald-500 via-emerald-300 to-transparent shadow-[0_0_15px_#10B981] z-20 transition-all duration-300"
-                      style={{ left: `${scanProgress}%` }}
-                    />
-                  )}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-[#4F71AC]/40 hover:border-[#C9A96E] rounded-xl py-10 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <PhotoIcon className="w-8 h-8 text-[#6D8BC3]" />
+                  <span className="text-xs font-bold text-gray-200">
+                    {isKhmer ? 'ចុចដើម្បីជ្រើសរើសឯកសារស្កេន' : 'Click to choose the scanned file'}
+                  </span>
+                  <span className="text-[10px] text-gray-500">JPG, PNG, PDF</span>
                 </div>
-
-                {/* Progress bar */}
-                {isScanning && (
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-emerald-400 flex items-center gap-1.5">
-                        <SparklesIcon className="w-4 h-4 animate-spin" />
-                        <span>{t.checkInOut.scanningInProgress}</span>
-                      </span>
-                      <span className="font-mono text-white">{scanProgress}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-blue-500 via-emerald-400 to-[#C9A96E] transition-all duration-300"
-                        style={{ width: `${scanProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
-              <div className="text-center space-y-3">
-                <p className="text-xs text-gray-400">
-                  {t.checkInOut.scannerTip}
-                </p>
-
-                <div className="flex justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={triggerPrinterScan}
-                    disabled={isScanning}
-                    className="px-6 py-3 bg-[#253B73] hover:bg-[#111B3A] text-[#C9A96E] border border-[#C9A96E]/50 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    <PrinterIcon className="w-4 h-4" />
-                    <span>{isScanning ? 'Scanning...' : (isKhmer ? 'ចាប់ផ្តើមស្កេនពីម៉ាស៊ីនព្រីន' : 'Start Printer Scan')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-3 bg-white/10 hover:bg-white/20 text-gray-200 font-bold text-xs rounded-xl transition-colors flex items-center gap-2"
-                  >
-                    <PhotoIcon className="w-4 h-4" />
-                    <span>{isKhmer ? 'ជ្រើសរើសឯកសារស្កេន (PDF/JPG)' : 'Choose Scanned File'}</span>
-                  </button>
-                </div>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-6 py-3 bg-[#253B73] hover:bg-[#111B3A] text-[#C9A96E] border border-[#C9A96E]/50 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 active:scale-95"
+                >
+                  <PhotoIcon className="w-4 h-4" />
+                  <span>{isKhmer ? 'ជ្រើសរើសឯកសារស្កេន' : 'Choose Scanned File'}</span>
+                </button>
               </div>
             </div>
           )}
