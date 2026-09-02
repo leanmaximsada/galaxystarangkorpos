@@ -26,6 +26,13 @@ interface IdCaptureModalProps {
   onCaptureComplete: (imageDataUrl: string, source: 'CAMERA' | 'SCANNER', extractedId?: string) => void;
   initialMode?: 'CAMERA' | 'SCANNER';
   guestName?: string;
+  // A camera stream started synchronously inside the button click that
+  // opened this modal. iOS Safari only reliably grants getUserMedia when
+  // it's called directly inside a user-gesture handler — by the time this
+  // component's own useEffect runs, the tap is no longer "fresh" enough
+  // for Safari, so it silently stalls. Passing an already-started stream
+  // in sidesteps that entirely.
+  initialStream?: MediaStream | null;
 }
 
 export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
@@ -33,7 +40,8 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
   onClose,
   onCaptureComplete,
   initialMode = 'CAMERA',
-  guestName = 'Guest'
+  guestName = 'Guest',
+  initialStream = null
 }) => {
   const { language, t } = useHotel();
   const isKhmer = language === 'KM';
@@ -51,8 +59,7 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Reset state on open, then immediately start the camera in the same
-  // effect — no separate effect racing on a stale `capturedImage` value.
+  // Reset state on open, then attach the camera in the same effect.
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
@@ -65,14 +72,28 @@ export const IdCaptureModal: React.FC<IdCaptureModalProps> = ({
     setScanProgress(0);
 
     if (initialMode === 'CAMERA') {
-      startCamera();
+      if (initialStream) {
+        // A stream was already granted synchronously in the parent's
+        // click handler — just attach it, no new getUserMedia() call.
+        streamRef.current = initialStream;
+        setCameraError(null);
+        if (videoRef.current) {
+          videoRef.current.srcObject = initialStream;
+          videoRef.current.play();
+          setCameraActive(true);
+        }
+      } else {
+        // No pre-warmed stream (e.g. desktop, where this reliably works
+        // without a gesture) — fall back to the normal auto-start.
+        startCamera();
+      }
     }
 
     return () => {
       stopCamera();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialMode]);
+  }, [isOpen, initialMode, initialStream]);
 
   // Handle camera restart when the user switches tabs (CAMERA <-> SCANNER),
   // flips front/back facing, or retakes a photo — separate from the

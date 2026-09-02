@@ -162,8 +162,25 @@ export const WalkInCheckInModal: React.FC = () => {
     }
   };
 
-  const openCameraCapture = () => {
+  const [preWarmedStream, setPreWarmedStream] = useState<MediaStream | null>(null);
+
+  const openCameraCapture = async () => {
     setIdCaptureInitialMode('CAMERA');
+    // Request the camera immediately, inside this click handler — this is
+    // what makes iOS Safari treat it as a real user gesture and actually
+    // grant access, instead of silently stalling.
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        setPreWarmedStream(stream);
+      }
+    } catch (err) {
+      console.warn('Camera pre-warm failed, modal will fall back to its own request:', err);
+      setPreWarmedStream(null);
+    }
     setIsIdCaptureOpen(true);
   };
 
@@ -877,10 +894,23 @@ export const WalkInCheckInModal: React.FC = () => {
       {/* ID Capture / Scanner Hardware Modal */}
       <IdCaptureModal
         isOpen={isIdCaptureOpen}
-        onClose={() => setIsIdCaptureOpen(false)}
+        onClose={() => {
+          setIsIdCaptureOpen(false);
+          if (preWarmedStream) {
+            preWarmedStream.getTracks().forEach(track => track.stop());
+            setPreWarmedStream(null);
+          }
+        }}
         initialMode={idCaptureInitialMode}
         guestName={guestName || 'Walk-In Guest'}
-        onCaptureComplete={handleIdCaptureComplete}
+        onCaptureComplete={(imageDataUrl, source, extractedId) => {
+          if (preWarmedStream) {
+            preWarmedStream.getTracks().forEach(track => track.stop());
+            setPreWarmedStream(null);
+          }
+          handleIdCaptureComplete(imageDataUrl, source, extractedId);
+        }}
+        initialStream={preWarmedStream}
       />
 
       {/* Preview modal for captured ID */}

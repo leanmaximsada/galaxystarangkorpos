@@ -127,9 +127,27 @@ export const GuestsView: React.FC = () => {
 
   const nationalities = Array.from(new Set(guests.map(g => g.nationality)));
 
-  const handleOpenCaptureForGuest = (guest: Guest, mode: 'CAMERA' | 'SCANNER') => {
+  const [preWarmedStream, setPreWarmedStream] = useState<MediaStream | null>(null);
+
+  const handleOpenCaptureForGuest = async (guest: Guest, mode: 'CAMERA' | 'SCANNER') => {
     setTargetGuest(guest);
     setCaptureMode(mode);
+    if (mode === 'CAMERA') {
+      // Requested synchronously inside this click so iOS Safari treats it
+      // as a real user gesture instead of silently stalling.
+      try {
+        if (navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false,
+          });
+          setPreWarmedStream(stream);
+        }
+      } catch (err) {
+        console.warn('Camera pre-warm failed, modal will fall back to its own request:', err);
+        setPreWarmedStream(null);
+      }
+    }
     setIsCaptureOpen(true);
   };
 
@@ -478,10 +496,21 @@ export const GuestsView: React.FC = () => {
         onClose={() => {
           setIsCaptureOpen(false);
           setTargetGuest(null);
+          if (preWarmedStream) {
+            preWarmedStream.getTracks().forEach(track => track.stop());
+            setPreWarmedStream(null);
+          }
         }}
         initialMode={captureMode}
         guestName={targetGuest?.name || 'Guest'}
-        onCaptureComplete={handleCaptureComplete}
+        onCaptureComplete={(imageDataUrl, source, extractedId) => {
+          if (preWarmedStream) {
+            preWarmedStream.getTracks().forEach(track => track.stop());
+            setPreWarmedStream(null);
+          }
+          handleCaptureComplete(imageDataUrl, source, extractedId);
+        }}
+        initialStream={preWarmedStream}
       />
 
       {/* Edit Guest Profile & Stay Details Modal */}
