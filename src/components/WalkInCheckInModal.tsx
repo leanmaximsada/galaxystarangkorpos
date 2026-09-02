@@ -47,6 +47,7 @@ export const WalkInCheckInModal: React.FC = () => {
 
   // Form State
   const [selectedRoomId, setSelectedRoomId] = useState<string>(preselectedWalkInRoomId || availableRooms[0]?.id || '');
+    const [preWarmedStream, setPreWarmedStream] = useState<MediaStream | null>(null);
   // Room "cart" — allows booking multiple rooms (e.g. 2 One Bed Rooms + 3 Twin Bed Rooms) in one walk-in
   const [cartRooms, setCartRooms] = useState<Room[]>([]);
 
@@ -161,8 +162,6 @@ export const WalkInCheckInModal: React.FC = () => {
       setNights(diffNights);
     }
   };
-
-  const [preWarmedStream, setPreWarmedStream] = useState<MediaStream | null>(null);
 
   const openCameraCapture = async () => {
     setIdCaptureInitialMode('CAMERA');
