@@ -91,7 +91,7 @@ export const ReportsView: React.FC = () => {
       p.currency,
       p.payment_method,
       `"${p.bank_name || p.transaction_reference || ''}"`,
-      p.staff_name,
+      p.received_by,
       p.payment_status
     ]);
 
@@ -129,7 +129,7 @@ export const ReportsView: React.FC = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-sm transition-all"
           >
             <CalculatorIcon className="w-5 h-5" />
-            {repText.shiftCloseout}
+            {repText.shiftZReport}
           </button>
 
           <button
@@ -210,11 +210,11 @@ export const ReportsView: React.FC = () => {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">USD Equivalent Net</p>
             <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
-              ${(totalRevenueUsd + totalRevenueKhr / 4100).toFixed(2)}
+              ${(totalRevenueUsd + totalRevenueKhr / 4000).toFixed(2)}
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400">
-            Based on official peg @ 4,100 KHR
+            Based on official peg @ 4,000 KHR
           </div>
         </div>
       </div>
@@ -387,11 +387,11 @@ export const ReportsView: React.FC = () => {
                       <span className="text-xs font-normal text-slate-400 ml-1">{p.currency}</span>
                     </td>
                     <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-300">
-                      {p.staff_name}
+                      {p.received_by}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        p.payment_status === 'COMPLETED'
+                        p.payment_status === 'PAID'
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                           : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
                       }`}>

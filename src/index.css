@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Prevent auto-zoom on input focus (mobile/PWA) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
 @layer base {
   :root {
     --color-deep-navy: #111B3A;

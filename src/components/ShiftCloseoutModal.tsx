@@ -80,7 +80,7 @@ export const ShiftCloseoutModal: React.FC = () => {
             </span>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {repText.shiftCloseout}
+                {repText.shiftZReport}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isKhmer ? 'ផ្ទៀងផ្ទាត់សាច់ប្រាក់ និងបិទវេនបម្រើការងារ' : 'Cash drawer reconciliation & shift audit closeout'}
@@ -120,7 +120,7 @@ export const ShiftCloseoutModal: React.FC = () => {
                 onClick={handlePrint}
                 className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold shadow-sm"
               >
-                {repText.printReport}
+                {repText.printZReport}
               </button>
               <button
                 onClick={closeShiftCloseoutModal}
@@ -244,7 +244,7 @@ export const ShiftCloseoutModal: React.FC = () => {
                 <div className="text-right">
                   <p className="text-slate-500 font-medium">Shift Total Revenue (USD Equiv.)</p>
                   <p className="text-sm font-bold text-amber-700 dark:text-amber-400 mt-0.5">
-                    ${(cashUsdExpected + bankUsdExpected + (cashKhrExpected + bankKhrExpected) / 4100).toFixed(2)}
+                    ${(cashUsdExpected + bankUsdExpected + (cashKhrExpected + bankKhrExpected) / 4000).toFixed(2)}
                   </p>
                 </div>
               </div>

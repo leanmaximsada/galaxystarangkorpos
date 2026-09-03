@@ -943,7 +943,7 @@ export const RoomsView: React.FC = () => {
                       setFormData({ 
                         ...formData, 
                         priceUsd: usd, 
-                        priceKhr: usd * 4100 
+                        priceKhr: usd * 4000
                       });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-[#C9A96E] focus:outline-none"
@@ -1284,7 +1284,7 @@ export const RoomsView: React.FC = () => {
                     value={categoryForm.defaultPriceUsd}
                     onChange={e => {
                       const usd = Number(e.target.value);
-                      setCategoryForm({ ...categoryForm, defaultPriceUsd: usd, defaultPriceKhr: usd * 4100 });
+                      setCategoryForm({ ...categoryForm, defaultPriceUsd: usd, defaultPriceKhr: usd * 4000 });
                     }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-[#C9A96E] focus:outline-none"
                   />

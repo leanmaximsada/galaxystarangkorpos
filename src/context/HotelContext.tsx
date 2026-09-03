@@ -716,13 +716,13 @@ export const INITIAL_SETTINGS: HotelSettings = {
   vatNumber: "K005-901827461",
   checkInTime: "14:00",
   checkOutTime: "12:00",
-  exchangeRateUsdToKhr: 4100,
+  exchangeRateUsdToKhr: 4000,
   wifiSsid: "GalaxyStar_Guest_HighSpeed",
   wifiPass: "AngkorStar2026",
   receiptFooterNoteEn:
     "Thank you for staying with us at Galaxy Star Angkor Hotel! Enjoy your memorable journey in the Kingdom of Wonder.",
   receiptFooterNoteKm:
-    "សូមថ្លែងអំណរគុណយ៉ាងជ្រាលជ្រៅចំពោះការស្នាក់នៅសណ្ឋាគារ ហ្គាឡាក់ស៊ី ស្តារ អង្គរ! សូមជូនពរឱ្យការធ្វើដំណើរកាន់តែរីករាយ។",
+    "សូមថ្លែងអំណរគុណយ៉ាងជ្រាលជ្រៅចំពោះការស្នាក់នៅសណ្ឋាគារ ផ្កាយហ្គាឡាក់ស៊ី អង្គរ! សូមជូនពរឱ្យការធ្វើដំណើរកាន់តែរីករាយ។",
 };
 
 interface HotelContextType {
