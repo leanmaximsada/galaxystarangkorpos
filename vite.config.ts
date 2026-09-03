@@ -13,7 +13,7 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['logo.png'],
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
         manifest: {
           name: 'Galaxy Star Angkor Hotel — Management System',

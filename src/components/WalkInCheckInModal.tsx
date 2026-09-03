@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHotel } from '../context/HotelContext';
 import { FormattedDateInput } from './FormattedDateInput';
+import { formatDate } from '../utils/dateFormatter';
 import { Currency, PaymentMethod, Room } from '../types';
 import { 
   UserPlusIcon, 
@@ -37,7 +38,8 @@ export const WalkInCheckInModal: React.FC = () => {
     language, 
     t, 
     openReceiptModal,
-    preselectedWalkInRoomId
+    preselectedWalkInRoomId,
+    settings
   } = useHotel();
 
   const isKhmer = language === 'KM';
@@ -82,6 +84,10 @@ export const WalkInCheckInModal: React.FC = () => {
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   
+  const HOURLY_STAY_RATE_USD = 10;
+  const HOURLY_STAY_HOURS = 2;
+
+  const [stayType, setStayType] = useState<'OVERNIGHT' | 'HOURLY'>('OVERNIGHT');
   const [checkInDate, setCheckInDate] = useState<string>(todayStr);
   const [checkOutDate, setCheckOutDate] = useState<string>(tomorrowStr);
   const [nights, setNights] = useState<number>(1);
@@ -109,8 +115,13 @@ export const WalkInCheckInModal: React.FC = () => {
   const currentRoom = rooms.find(r => r.id === selectedRoomId) || selectableRooms[0];
   const roomPrice = currentRoom ? (isKhr ? currentRoom.priceKhr : currentRoom.priceUsd) : 0;
 
+  const exchangeRate = settings.exchangeRateUsdToKhr || 4100;
+  const hourlyRatePerRoom = isKhr ? HOURLY_STAY_RATE_USD * exchangeRate : HOURLY_STAY_RATE_USD;
+
   // Total cost across every room in the cart
-  const totalCost = cartRooms.reduce((sum, r) => sum + (isKhr ? r.priceKhr : r.priceUsd) * nights, 0);
+  const totalCost = stayType === 'HOURLY'
+    ? cartRooms.length * hourlyRatePerRoom
+    : cartRooms.reduce((sum, r) => sum + (isKhr ? r.priceKhr : r.priceUsd) * nights, 0);
 
   const handleRoomChange = (roomId: string) => {
     setSelectedRoomId(roomId);
@@ -142,6 +153,21 @@ export const WalkInCheckInModal: React.FC = () => {
         setSelectedRoomId(room.id);
         setKeyCardNumber(`CARD-${room.number}`);
       }
+    }
+  };
+
+  const handleCheckInDateChange = (newCheckIn: string) => {
+    setCheckInDate(newCheckIn);
+    const checkIn = new Date(newCheckIn);
+    const checkOut = new Date(checkOutDate);
+    const diffNights = Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000);
+
+    if (diffNights >= 1) {
+      setNights(diffNights);
+    } else {
+      const preservedNights = Math.max(1, nights);
+      setNights(preservedNights);
+      setCheckOutDate(new Date(checkIn.getTime() + preservedNights * 86400000).toISOString().split('T')[0]);
     }
   };
 
@@ -224,6 +250,12 @@ export const WalkInCheckInModal: React.FC = () => {
     }
 
     try {
+      const isHourly = stayType === 'HOURLY';
+      const hourlyDeadline = new Date(new Date(checkInDate).getTime() + HOURLY_STAY_HOURS * 3600000);
+      const hourlyNote = isKhmer
+        ? `គេងម៉ោង (${HOURLY_STAY_HOURS} ម៉ោង) — ត្រូវចាកចេញត្រឹមម៉ោង ${hourlyDeadline.getHours()}:${String(hourlyDeadline.getMinutes()).padStart(2, '0')}`
+        : `Hourly Stay (${HOURLY_STAY_HOURS}h) — check-out by ${hourlyDeadline.getHours()}:${String(hourlyDeadline.getMinutes()).padStart(2, '0')}`;
+
       const result = walkInCheckIn({
         guestName,
         guestNameKm,
@@ -233,16 +265,20 @@ export const WalkInCheckInModal: React.FC = () => {
         nationality,
         roomIds: cartRooms.map(r => r.id),
         checkInDate,
-        checkOutDate,
-        nights,
+        checkOutDate: isHourly ? checkInDate : checkOutDate,
+        nights: isHourly ? 1 : nights,
         adults,
         children,
         currency,
+        stayType,
+        hourlyRatePerRoom: isHourly ? hourlyRatePerRoom : undefined,
+        specialRequests: isHourly
+          ? (specialRequests ? `${hourlyNote} | ${specialRequests}` : hourlyNote)
+          : specialRequests,
         depositAmount: depositVal > 0 ? depositVal : undefined,
         depositMethod: paymentMethod,
         bankName: paymentMethod === 'BANK' ? bankName : undefined,
         txnRef: paymentMethod === 'BANK' ? txnRef : undefined,
-        specialRequests,
         isVip,
         keyCardNumber: keyCardNumber || `CARD-${currentRoom?.number}`,
         idCardImage: capturedIdImage,
@@ -567,6 +603,36 @@ export const WalkInCheckInModal: React.FC = () => {
                     </div>
 
                     {/* Cart of added rooms */}
+                                        {/* Stay Type Toggle */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStayType('OVERNIGHT')}
+                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          stayType === 'OVERNIGHT'
+                            ? 'bg-[#253B73] text-white border-[#253B73] shadow-xs'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {isKhmer ? 'ស្នាក់នៅមួយយប់' : 'Overnight Stay'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStayType('HOURLY');
+                          setCheckOutDate(checkInDate);
+                        }}
+                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          stayType === 'HOURLY'
+                            ? 'bg-[#D81B73] text-white border-[#D81B73] shadow-xs'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {isKhmer ? `គេងម៉ោង (${HOURLY_STAY_HOURS} ម៉ោង)` : `Hourly Stay (${HOURLY_STAY_HOURS}h)`}
+                      </button>
+                    </div>
+
+                    {/* Cart of added rooms */}
                     {cartRooms.length > 0 && (
                       <div className="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
                         {cartRooms.map(r => (
@@ -610,64 +676,71 @@ export const WalkInCheckInModal: React.FC = () => {
                         </label>
                         <FormattedDateInput
                           value={checkInDate}
-                          onChange={setCheckInDate}
+                          onChange={(d) => {
+                            handleCheckInDateChange(d);
+                            if (stayType === 'HOURLY') setCheckOutDate(d);
+                          }}
                           language={language}
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                          {isKhmer ? 'ថ្ងៃចេញ' : 'Check-Out Date'}
-                        </label>
-                        <FormattedDateInput
-                          value={checkOutDate}
-                          onChange={handleCheckOutDateChange}
-                          language={language}
-                          min={checkInDate}
-                        />
-                      </div>
+                      {stayType === 'OVERNIGHT' ? (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                            {isKhmer ? 'ថ្ងៃចេញ' : 'Check-Out Date'}
+                          </label>
+                          <FormattedDateInput
+                            value={checkOutDate}
+                            onChange={handleCheckOutDateChange}
+                            language={language}
+                            min={checkInDate}
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                            {isKhmer ? 'រយៈពេលស្នាក់នៅ' : 'Duration'}
+                          </label>
+                          <div className="px-3.5 py-2 rounded-xl border border-[#EAD9AF] bg-[#FBF7EF] text-xs font-bold text-[#6E5630] flex items-center gap-1.5">
+                            <span>⏰</span>
+                            <span>{HOURLY_STAY_HOURS} {isKhmer ? 'ម៉ោង' : 'hours'} · {formatDate(checkInDate, language)}</span>
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            {t.checkInOut.nights}
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="30"
-                            value={nights}
-                            onChange={(e) => handleNightsChange(parseInt(e.target.value) || 1)}
-                            className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-center focus:ring-2 focus:ring-[#253B73] focus:outline-hidden"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            {t.checkInOut.adults}
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={adults}
-                            onChange={(e) => setAdults(parseInt(e.target.value) || 1)}
-                            className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-center focus:ring-2 focus:ring-[#253B73] focus:outline-hidden"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            {t.checkInOut.children}
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            value={children}
-                            onChange={(e) => setChildren(parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-center focus:ring-2 focus:ring-[#253B73] focus:outline-hidden"
-                          />
-                        </div>
+                    {stayType === 'OVERNIGHT' && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                        {t.checkInOut.nights}
+                      </label>
+                      <div className="flex items-stretch gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleNightsChange(nights - 1)}
+                          disabled={nights <= 1}
+                          className="w-11 shrink-0 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-lg font-bold text-[#253B73] flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          value={nights}
+                          onChange={(e) => handleNightsChange(parseInt(e.target.value) || 1)}
+                          className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-300 text-sm font-bold text-center focus:ring-2 focus:ring-[#253B73] focus:outline-hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleNightsChange(nights + 1)}
+                          disabled={nights >= 30}
+                          className="w-11 shrink-0 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-lg font-bold text-[#253B73] flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform"
+                        >
+                          +
+                        </button>
                       </div>
+                    </div>
+                    )}
                     </div>
                   </div>
                 )}
@@ -708,7 +781,9 @@ export const WalkInCheckInModal: React.FC = () => {
                 <div className="bg-[#FAF9F6] p-4 rounded-2xl border border-gray-200 flex items-center justify-between">
                   <div>
                     <span className="text-[11px] text-gray-500 block">
-                      {cartRooms.length} room{cartRooms.length !== 1 ? 's' : ''} × {nights} {t.checkInOut.nights}
+                      {stayType === 'HOURLY'
+                        ? `${cartRooms.length} room${cartRooms.length !== 1 ? 's' : ''} × ${HOURLY_STAY_HOURS}h stay`
+                        : `${cartRooms.length} room${cartRooms.length !== 1 ? 's' : ''} × ${nights} ${t.checkInOut.nights}`}
                     </span>
                     <span className="text-sm font-bold text-[#111B3A]">{t.checkInOut.totalCost}</span>
                   </div>

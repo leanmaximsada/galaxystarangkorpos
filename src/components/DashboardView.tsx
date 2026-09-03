@@ -31,6 +31,7 @@ export const DashboardView: React.FC = () => {
     currentUser, 
     language, 
     rooms, 
+    roomCategories,
     reservations, 
     payments, 
     activities, 
@@ -81,6 +82,12 @@ export const DashboardView: React.FC = () => {
   const totalRooms = rooms.length;
   const occupiedRooms = rooms.filter(r => r.status === 'OCCUPIED').length;
   const availableRooms = rooms.filter(r => r.status === 'AVAILABLE').length;
+  const availableByCategory = roomCategories
+    .map(cat => ({
+      label: isKhmer ? (cat.nameKm || cat.name) : cat.name,
+      count: rooms.filter(r => r.status === 'AVAILABLE' && r.type === cat.code).length,
+    }))
+    .filter(entry => entry.count > 0);
   const cleaningRooms = rooms.filter(r => r.status === 'CLEANING').length;
   const maintenanceRooms = rooms.filter(r => r.status === 'MAINTENANCE').length;
   const occupancyPercentage = Math.round((occupiedRooms / totalRooms) * 100);
@@ -279,12 +286,24 @@ export const DashboardView: React.FC = () => {
 
             {/* Status Legend Grid */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-emerald-900 font-medium">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  {t.roomStatus.AVAILABLE}
-                </span>
-                <span className="font-bold font-mono text-emerald-800">{availableRooms}</span>
+              <div className="col-span-2 p-2.5 rounded-xl bg-[#EEF6F1]/70 border border-[#DCEEE3]">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-[#234432] font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#4C9C70]"></span>
+                    {t.roomStatus.AVAILABLE}
+                  </span>
+                  <span className="font-bold font-mono text-[#29523B]">{availableRooms}</span>
+                </div>
+                {availableByCategory.length > 0 && (
+                  <div className="mt-1.5 pl-4.5 space-y-0.5">
+                    {availableByCategory.map(entry => (
+                      <div key={entry.label} className="flex items-center justify-between text-[11px] text-[#3A8059] font-medium">
+                        <span className="truncate pr-2">{entry.label}</span>
+                        <span className="font-mono font-bold shrink-0">{entry.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="p-2.5 rounded-xl bg-[#111B3A]/5 border border-[#111B3A]/15 flex items-center justify-between">

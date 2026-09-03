@@ -823,6 +823,8 @@ interface HotelContextType {
     adults: number;
     children: number;
     currency: Currency;
+    stayType?: 'OVERNIGHT' | 'HOURLY';
+    hourlyRatePerRoom?: number; // flat amount per room, in `currency`, used when stayType is 'HOURLY'
     depositAmount?: number;
     depositMethod?: PaymentMethod;
     bankName?: string;
@@ -1861,6 +1863,8 @@ export const HotelProvider: React.FC<{
   };
 
   const walkInCheckIn = (data: {
+    stayType?: 'OVERNIGHT' | 'HOURLY';
+    hourlyRatePerRoom?: number;
     guestName: string;
     guestNameKm?: string;
     passportOrId: string;
@@ -1894,9 +1898,11 @@ export const HotelProvider: React.FC<{
 
     const isKhr = data.currency === "KHR";
 
-    const roomAmounts = targetRooms.map((room) => ({
+    const roomAmounts = targetRooms.map(room => ({
       room,
-      total: data.nights * (isKhr ? room.priceKhr : room.priceUsd),
+      total: (data.stayType === 'HOURLY' && data.hourlyRatePerRoom !== undefined)
+        ? data.hourlyRatePerRoom
+        : data.nights * (isKhr ? room.priceKhr : room.priceUsd),
     }));
     const groupTotal = roomAmounts.reduce((sum, r) => sum + r.total, 0);
 
