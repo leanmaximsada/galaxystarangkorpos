@@ -3,6 +3,7 @@ import { useHotel } from '../context/HotelContext';
 import { Guest } from '../types';
 import { 
   XMarkIcon, 
+  CameraIcon, PhotoIcon,
   UserIcon, 
   IdentificationIcon, 
   PhoneIcon, 
@@ -19,15 +20,12 @@ import { SparklesIcon as SolidSparklesIcon } from '@heroicons/react/24/solid';
 
 interface EditGuestModalProps {
   isOpen: boolean;
-  guest: Guest | null;
   onClose: () => void;
+  guest: Guest | null;
+  onCaptureId?: (mode: 'CAMERA' | 'SCANNER') => void;
 }
 
-export const EditGuestModal: React.FC<EditGuestModalProps> = ({
-  isOpen,
-  guest,
-  onClose
-}) => {
+export const EditGuestModal: React.FC<EditGuestModalProps> = ({ isOpen, onClose, guest, onCaptureId }) => {
   const { rooms, updateGuest, language, t } = useHotel();
   const isKhmer = language === 'KM';
 
@@ -160,16 +158,32 @@ export const EditGuestModal: React.FC<EditGuestModalProps> = ({
                     {isKhmer ? 'លេខបន្ទប់' : 'Room Number'} *
                   </label>
                   <div className="relative">
-                    <BuildingOffice2Icon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
+                    <BuildingOffice2Icon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
                       required
                       value={roomNumber}
                       onChange={(e) => setRoomNumber(e.target.value)}
-                      placeholder="e.g. 101"
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-900 focus:ring-2 focus:ring-[#253B73] focus:outline-hidden"
-                    />
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-900 focus:ring-2 focus:ring-[#253B73] focus:outline-hidden appearance-none"
+                    >
+                      {/* The guest's current room is always shown, even though it's OCCUPIED (by them) */}
+                      {roomNumber && !rooms.some(r => r.number === roomNumber && r.status === 'AVAILABLE') && (
+                        <option value={roomNumber}>
+                          {roomNumber} ({isKhmer ? 'បន្ទប់បច្ចុប្បន្ន' : 'Current Room'})
+                        </option>
+                      )}
+                      {rooms
+                        .filter(r => r.status === 'AVAILABLE')
+                        .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
+                        .map(r => (
+                          <option key={r.id} value={r.number}>
+                            {r.number} — {r.categoryName || t.roomTypes[r.type as keyof typeof t.roomTypes] || r.type}
+                          </option>
+                        ))}
+                    </select>
                   </div>
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    {isKhmer ? 'ជ្រើសរើសបន្ទប់ត្រឹមត្រូវ ប្រសិនបើបានជ្រើសរើសខុស' : 'Pick the correct room if the wrong one was assigned'}
+                  </p>
                 </div>
 
                 <div>
@@ -205,6 +219,53 @@ export const EditGuestModal: React.FC<EditGuestModalProps> = ({
                 </div>
               </div>
 
+
+                              <div className="pt-1">
+                <label className="block text-[11px] font-semibold text-gray-700 mb-1.5">
+                  {isKhmer ? 'រូបភាពអត្តសញ្ញាណប័ណ្ណ' : 'ID Document Photo'}
+                </label>
+                <div className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-200">
+                  {guest?.idCardImage ? (
+                    <img
+                      src={guest.idCardImage}
+                      alt="ID"
+                      className="w-20 h-14 rounded-lg object-cover border border-gray-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-20 h-14 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-gray-400 shrink-0">
+                      <IdentificationIcon className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-semibold text-gray-700">
+                      {guest?.idCardImage
+                        ? (isKhmer ? 'បានភ្ជាប់រូបភាពរួច' : 'Photo attached')
+                        : (isKhmer ? 'មិនទាន់មានរូបភាព' : 'No photo yet')}
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {isKhmer ? 'ចុចដើម្បីថត ឬស្កេនម្ដងទៀត ប្រសិនបើខុស ឬមិនច្បាស់' : 'Retake or rescan if wrong or unclear'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onCaptureId && onCaptureId('CAMERA')}
+                      className="px-3 py-1.5 rounded-lg bg-[#253B73] hover:bg-[#111B3A] text-white text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <CameraIcon className="w-3.5 h-3.5" />
+                      {isKhmer ? 'ថតម្ដងទៀត' : 'Retake'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCaptureId && onCaptureId('SCANNER')}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <PhotoIcon className="w-3.5 h-3.5" />
+                      {isKhmer ? 'ផ្ទុកឯកសារ' : 'Upload File'}
+                    </button>
+                  </div>
+                </div>
+              </div>
               {/* Financial - Amount Paid */}
               <div className="pt-2 border-t border-gray-200/60">
                 <label className="block text-[11px] font-semibold text-gray-700 mb-1">

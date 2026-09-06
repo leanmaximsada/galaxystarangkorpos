@@ -19,7 +19,7 @@ import {
 import { translations } from "../translations";
 import { generateSampleIdCardSvg } from "../utils/idGenerator";
 import { supabase } from "../lib/supabase";
-import { sendTelegramCheckInNotification, editTelegramCheckInMessage, editTelegramCheckInPhoto } from '../utils/telegram';
+import { sendTelegramCheckInNotification, editTelegramCheckInMessage, editTelegramCheckInPhoto, sendTelegramPhotoAsNewMessage, deleteTelegramMessage } from '../utils/telegram';
 import { formatDate } from '../utils/dateFormatter';
 
 // Sample Staff Accounts
@@ -952,6 +952,9 @@ function sanitizeItems<T extends { id: string }>(
     return item;
   });
 }
+function isKhmer(lang: Language): boolean {
+  return lang === 'KM';
+}
 
 const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
@@ -1508,6 +1511,62 @@ export const HotelProvider: React.FC<{
           console.error("Failed to log activity in Supabase:", error.message);
       });
   };
+    // Silently corrects the Telegram message linked to a reservation, using
+  // whatever the reservation's current (already-updated) data is. Called
+  // automatically from Guest/Check-In/Check-Out edits — never surfaced to
+  // staff as a separate step.
+  const syncTelegramForReservation = (res: Reservation, newIdCardImage?: string) => {
+    if (!res.telegramMessageId) return;
+
+    const isKhr = res.currency === 'KHR';
+    const paidAmountText = isKhr
+      ? `${res.paid_amount_khr.toLocaleString()} KHR`
+      : `$${res.paid_amount_usd.toFixed(2)}`;
+    const paymentMethodText = res.payment_status === 'PAID'
+      ? (isKhmer(language) ? 'បង់ប្រាក់ពេញ' : 'Paid in Full')
+      : res.payment_status === 'PARTIALLY_PAID'
+        ? (isKhmer(language) ? 'បង់ខ្លះ' : 'Partial Payment')
+        : (isKhmer(language) ? 'មិនទាន់បង់' : 'Unpaid');
+
+    const notifData = {
+      guestName: res.guest_name,
+      staffName: currentUser.name,
+      roomNumbers: res.room_number,
+      checkInDate: formatDate(res.check_in_date, language),
+      checkOutDate: formatDate(res.check_out_date, language),
+      paidAmount: paidAmountText,
+      paymentMethod: paymentMethodText,
+    };
+
+    if (newIdCardImage && res.telegramHasPhoto) {
+      // Message already has a photo — swap it directly via edit
+      editTelegramCheckInPhoto(settings, res.telegramMessageId, newIdCardImage, notifData)
+        .catch(err => console.error('Telegram photo auto-sync failed:', err));
+    } else if (newIdCardImage && !res.telegramHasPhoto) {
+      // Original message was text-only — Telegram can't retrofit a photo
+      // onto it via edit, so send a fresh replacement message with the
+      // photo, delete the old text-only one, and track the new message
+      // for any future edits — ends up as a single message, not two.
+      const oldMessageId = res.telegramMessageId;
+      sendTelegramPhotoAsNewMessage(settings, newIdCardImage, notifData).then(result => {
+        if (!result.messageId) return;
+        setReservations(prev => prev.map(r => r.id === res.id
+          ? { ...r, telegramMessageId: result.messageId, telegramHasPhoto: true }
+          : r
+        ));
+        supabase.from('reservations').update({
+          telegram_message_id: result.messageId,
+          telegram_has_photo: true,
+        }).eq('id', res.id).then(({ error }) => {
+          if (error) console.error('Failed to save new telegram_message_id in Supabase:', error.message);
+        });
+        deleteTelegramMessage(settings, oldMessageId);
+      }).catch(err => console.error('Telegram new-photo-message send failed:', err));
+    } else {
+      editTelegramCheckInMessage(settings, res.telegramMessageId, !!res.telegramHasPhoto, notifData)
+        .catch(err => console.error('Telegram auto-sync failed:', err));
+    }
+  };
 
   const openRecordPaymentModal = () => setIsRecordPaymentOpen(true);
   const closeRecordPaymentModal = () => setIsRecordPaymentOpen(false);
@@ -1860,6 +1919,14 @@ export const HotelProvider: React.FC<{
       staffName: currentUser.name,
       timestamp,
     });
+
+        // Auto-correct the linked Telegram message with the confirmed check-in details
+    if (res.telegramMessageId) {
+      syncTelegramForReservation({
+        ...res,
+        room_number: targetRoom ? targetRoom.number : res.room_number,
+      });
+    }
   };
 
   const walkInCheckIn = (data: {
@@ -2745,6 +2812,16 @@ export const HotelProvider: React.FC<{
       timestamp,
     });
 
+        // Auto-correct the linked Telegram message to reflect the completed checkout
+    if (res.telegramMessageId) {
+      syncTelegramForReservation({
+        ...res,
+        payment_status: 'PAID',
+        paid_amount_khr: res.currency === 'KHR' ? res.total_amount : res.paid_amount_khr,
+        paid_amount_usd: res.currency === 'USD' ? res.total_amount : res.paid_amount_usd,
+      });
+    }
+
     return { payment: createdPayment };
   };
 
@@ -3063,40 +3140,83 @@ export const HotelProvider: React.FC<{
     );
 
     // If room number changed, update room guest mapping
-    if (updatedData.roomNumber) {
-      const targetRoomForGuest = rooms.find(
-        (room) => room.number === updatedData.roomNumber,
+    // If room number changed, properly swap room occupancy: free the old
+    // room, occupy the new one, and keep the linked reservation in sync.
+    if (updatedData.roomNumber && targetGuest && updatedData.roomNumber !== targetGuest.roomNumber) {
+      const oldRoom = rooms.find(room => room.number === targetGuest.roomNumber);
+      const newRoom = rooms.find(room => room.number === updatedData.roomNumber);
+      const guestDisplayNameForRoom = updatedData.name || targetGuest.name;
+
+      // Find the guest's active (checked-in) reservation to move along with them
+      const activeRes = reservations.find(r =>
+        r.status === 'CHECKED_IN' &&
+        (r.guest_id === guestId || r.guest_name.toLowerCase() === targetGuest.name.toLowerCase())
       );
-      setRooms((prev) =>
-        prev.map((room) => {
-          if (room.number === updatedData.roomNumber) {
-            return {
-              ...room,
-              currentGuestName: updatedData.name || room.currentGuestName,
-            };
+
+      if (newRoom) {
+        setRooms(prev => prev.map(room => {
+          if (room.id === newRoom.id) {
+            return { ...room, status: 'OCCUPIED', currentGuestName: guestDisplayNameForRoom, currentReservationId: activeRes?.id };
+          }
+          if (oldRoom && room.id === oldRoom.id) {
+            return { ...room, status: 'AVAILABLE', currentGuestName: undefined, currentReservationId: undefined };
           }
           return room;
-        }),
-      );
-      if (targetRoomForGuest) {
-        supabase
-          .from("rooms")
-          .update({
-            current_guest_name:
-              updatedData.name || targetRoomForGuest.currentGuestName || null,
-          })
-          .eq("id", targetRoomForGuest.id)
-          .then(({ error }) => {
-            if (error)
-              console.error(
-                "Failed to update room guest mapping in Supabase:",
-                error.message,
-              );
+        }));
+
+        supabase.from('rooms').update({
+          status: 'OCCUPIED',
+          current_guest_name: guestDisplayNameForRoom,
+          current_reservation_id: activeRes?.id || null,
+        }).eq('id', newRoom.id).then(({ error }) => {
+          if (error) console.error('Failed to occupy new room in Supabase:', error.message);
+        });
+
+        if (oldRoom) {
+          supabase.from('rooms').update({
+            status: 'AVAILABLE',
+            current_guest_name: null,
+            current_reservation_id: null,
+          }).eq('id', oldRoom.id).then(({ error }) => {
+            if (error) console.error('Failed to free old room in Supabase:', error.message);
           });
+        }
+
+        // Keep the reservation itself pointing at the correct room
+        if (activeRes) {
+          setReservations(prev => prev.map(r => r.id === activeRes.id
+            ? { ...r, room_id: newRoom.id, room_number: newRoom.number, room_type: newRoom.type }
+            : r));
+          supabase.from('reservations').update({
+            room_id: newRoom.id,
+            room_number: newRoom.number,
+            room_type: newRoom.type,
+          }).eq('id', activeRes.id).then(({ error }) => {
+            if (error) console.error('Failed to update reservation room in Supabase:', error.message);
+          });
+        }
       }
     }
 
+
+
     const guestDisplayName = updatedData.name || targetGuest?.name || "Guest";
+
+        // Auto-correct any linked Telegram message(s) — no manual step needed
+    const guestNameForSync = updatedData.name || targetGuest?.name;
+    reservations
+      .filter(r => (r.guest_id === guestId || (guestNameForSync && r.guest_name.toLowerCase() === guestNameForSync.toLowerCase())) && r.telegramMessageId)
+      .forEach(r => {
+        const isThisTheReassignedRoom = updatedData.roomNumber && targetGuest && updatedData.roomNumber !== targetGuest.roomNumber && r.status === 'CHECKED_IN';
+        const newRoomForSync = isThisTheReassignedRoom ? rooms.find(room => room.number === updatedData.roomNumber) : undefined;
+        syncTelegramForReservation({
+          ...r,
+          guest_name: guestNameForSync || r.guest_name,
+          check_in_date: updatedData.checkInDate !== undefined ? updatedData.checkInDate! : r.check_in_date,
+          check_out_date: updatedData.checkOutDate !== undefined ? updatedData.checkOutDate! : r.check_out_date,
+          room_number: newRoomForSync ? newRoomForSync.number : r.room_number,
+        }, updatedData.idCardImage);
+      });
 
     logActivity({
       type: "RESERVATION",
@@ -3106,6 +3226,7 @@ export const HotelProvider: React.FC<{
       timestamp: new Date().toISOString(),
     });
   };
+  
 
   const addHandoverNote = (data: {
     shift: "MORNING" | "EVENING" | "NIGHT";

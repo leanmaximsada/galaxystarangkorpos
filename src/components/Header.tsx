@@ -42,7 +42,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const isKhmer = language === 'KM';
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-xs px-4 sm:px-6 py-3">
+    <header 
+      className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-xs px-4 sm:px-6 py-3"
+      style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+    >
       <div className="flex items-center justify-between gap-4">
         
         {/* Left Side: Mobile Menu Button & Context Title */}

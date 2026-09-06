@@ -161,6 +161,11 @@ export const GuestsView: React.FC = () => {
           ? extractedId 
           : targetGuest.passportOrId
       });
+      // If the Edit modal is open for this same guest, refresh its preview immediately
+      setEditingGuest(prev => (prev && prev.id === targetGuest.id)
+        ? { ...prev, idCardImage: imageDataUrl, idSource: source, idScannedAt: new Date().toISOString() }
+        : prev
+      );
     }
     setIsCaptureOpen(false);
     setTargetGuest(null);
@@ -517,6 +522,7 @@ export const GuestsView: React.FC = () => {
       <EditGuestModal
         isOpen={!!editingGuest}
         guest={editingGuest}
+        onCaptureId={(mode) => editingGuest && handleOpenCaptureForGuest(editingGuest, mode)} 
         onClose={() => setEditingGuest(null)}
       />
     </div>

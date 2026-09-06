@@ -90,6 +90,42 @@ export async function sendTelegramCheckInNotification(
 }
 
 /**
+ * Sends the ID photo as a fresh Telegram message (used when the original
+ * check-in message had no photo to begin with — Telegram's API cannot
+ * convert a text message into a photo message via edit, only a brand new
+ * message can carry one). Returns the new message's ID so future edits
+ * target this message instead of the old text-only one.
+ */
+export async function sendTelegramPhotoAsNewMessage(
+  settings: HotelSettings,
+  image: string,
+  data: CheckInNotificationData
+): Promise<TelegramSendResult> {
+  return sendTelegramCheckInNotification(settings, { ...data, idCardImage: image });
+}
+
+/** Deletes a previously-sent bot message — used to clean up the old
+ * text-only message once its replacement photo message has sent successfully. */
+export async function deleteTelegramMessage(
+  settings: HotelSettings,
+  messageId: string
+): Promise<void> {
+  if (!settings.telegramBotToken || !settings.telegramChatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${settings.telegramBotToken}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: settings.telegramChatId,
+        message_id: Number(messageId),
+      }),
+    });
+  } catch (err) {
+    console.error('Failed to delete old Telegram message:', err);
+  }
+}
+
+/**
  * Edits an already-sent check-in notification in place — corrects the
  * caption/text (date, price, room number, etc.) without deleting and
  * resending. Works whether the original message had a photo or not.

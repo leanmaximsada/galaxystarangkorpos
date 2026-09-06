@@ -445,15 +445,7 @@ export const CheckInView: React.FC = () => {
                           <EyeIcon className="w-3.5 h-3.5 text-slate-600" />
                         </button>
                       )}
-                                              {res.telegramMessageId && (
-                          <button
-                            onClick={() => openTelegramEditModal(res)}
-                            className="p-1.5 rounded-lg bg-[#EEF1F8] hover:bg-[#253B73] border border-[#B9C7E3] text-[#253B73] hover:text-white transition-colors cursor-pointer"
-                            title={isKhmer ? 'កែសារ Telegram' : 'Edit Telegram message'}
-                          >
-                            <PaperAirplaneIcon className="w-4 h-4" />
-                          </button>
-                        )}
+                      
                     </div>
 
                     {/* Check-Out Trigger Button */}

@@ -78,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#111B3A] text-white flex flex-col border-r border-[#253B73] transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+                style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         {/* Top Branding Section */}
         <div className="p-5 border-b border-[#253B73]/60">
